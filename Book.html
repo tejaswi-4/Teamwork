@@ -1,0 +1,218 @@
+<!Doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simple Online Bookstore</title>
+  <style>
+    :root{
+      --bg:#f5f7fb; --card:#ffffff; --accent:#4b6cb7; --muted:#6b7280; --glass: rgba(255,255,255,0.6);
+      --radius:12px; --shadow: 0 6px 18px rgba(31,41,55,0.08);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#eef2ff 0%,var(--bg) 60%);color:#111827}
+    header{display:flex;align-items:center;justify-content:space-between;padding:18px 28px;backdrop-filter: blur(6px)}
+    .brand{display:flex;gap:14px;align-items:center}
+    .logo{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#2b7a78);display:flex;align-items:center;justify-content:center;color:white;font-weight:700}
+    .site-title{font-size:18px;font-weight:700}
+    .search{flex:1;max-width:720px;margin:0 24px}
+    .search input{width:100%;padding:12px 16px;border-radius:999px;border:1px solid #e6eef8;background:white;box-shadow:var(--shadow);font-size:14px}
+    .actions{display:flex;gap:12px;align-items:center}
+    .btn{background:var(--accent);color:white;padding:10px 14px;border-radius:10px;border:none;cursor:pointer;font-weight:600}
+    .main{display:grid;grid-template-columns:260px 1fr 320px;gap:22px;padding:26px}
+
+    /* Sidebar filters */
+    .panel{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+    .panel h3{margin:0 0 8px 0;font-size:15px}
+    .filter-item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed #f1f5f9}
+    .filter-item:last-child{border-bottom:none}
+    .categories{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+    .category{padding:8px;border-radius:8px;background:linear-gradient(180deg,#fbfbff,#fff);cursor:pointer;border:1px solid #f1f5f9}
+
+    /* Books grid */
+    .books-wrap{display:flex;flex-direction:column;gap:18px}
+    .controls{display:flex;justify-content:space-between;align-items:center}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:12px}
+    .card{background:var(--card);border-radius:14px;padding:14px;box-shadow:var(--shadow);display:flex;gap:12px}
+    .thumb{width:110px;height:150px;border-radius:8px;background:linear-gradient(180deg,#dfe9ff,#fff);display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:700}
+    .meta{flex:1;display:flex;flex-direction:column}
+    .title{font-weight:700;margin:0 0 6px 0}
+    .author{font-size:13px;color:var(--muted);margin-bottom:8px}
+    .price{font-weight:700;margin-top:auto}
+    .card .actions{align-self:flex-end}
+    .small-btn{padding:8px 10px;border-radius:10px;border:1px solid #e6eef8;background:white;cursor:pointer}
+
+    /* Cart */
+    .cart{position:sticky;top:26px}
+    .cart .summary{display:flex;flex-direction:column;gap:10px}
+    .cart-item{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;background:linear-gradient(180deg,#fff,#fbfbff);border:1px solid #f1f5f9}
+    .cart-item .qty{font-weight:700;padding:6px 10px;border-radius:8px;background:var(--glass);}
+    .checkout{margin-top:12px}
+
+    /* responsive */
+    @media (max-width:1000px){.main{grid-template-columns:1fr;grid-auto-rows:auto}.grid{grid-template-columns:repeat(2,1fr)}.cart{order:3}}
+    @media (max-width:600px){.grid{grid-template-columns:1fr}.search{display:none}.brand .site-title{display:none}}
+
+    footer{padding:20px;text-align:center;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo">OB</div>
+      <div class="site-title">OpenShelf — Online Bookstore</div>
+    </div>
+    <div class="search"><input id="q" placeholder="Search by title, author, or ISBN" oninput="onSearch()" /></div>
+    <div class="actions">
+      <button class="small-btn" onclick="toggleDark()">Theme</button>
+      <button class="btn" onclick="openCart()">Cart (<span id="cart-count">0</span>)</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <aside>
+      <div class="panel">
+        <h3>Categories</h3>
+        <div class="categories" id="category-list"></div>
+      </div>
+      <div style="height:18px"></div>
+      <div class="panel">
+        <h3>Filters</h3>
+        <div class="filter-item"><div>Price</div><div><input id="maxPrice" type="range" min="50" max="2000" value="2000" oninput="onFilter()"/></div></div>
+        <div class="filter-item"><div>Sort</div><div><select id="sort" onchange="renderBooks()"><option value="relevance">Relevance</option><option value="price-asc">Price: Low → High</option><option value="price-desc">Price: High → Low</option></select></div></div>
+      </div>
+    </aside>
+
+    <main class="books-wrap">
+      <div class="panel controls">
+        <div><strong id="results-count">0</strong> books found</div>
+        <div><small class="muted">Browse our curated collection</small></div>
+      </div>
+
+      <div class="grid" id="grid"></div>
+    </main>
+
+    <aside class="cart">
+      <div class="panel">
+        <h3>Cart</h3>
+        <div class="summary" id="cart-list">
+          <div style="color:var(--muted);">Your cart is empty</div>
+        </div>
+        <div class="checkout">
+          <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:10px"><div>Total</div><div id="cart-total">₹0</div></div>
+          <button class="btn" style="width:100%;margin-top:10px" onclick="checkout()">Checkout</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <footer>Built with ❤️ — Demo online bookstore (static). Want features like login, payments, or admin panel? Tell me which and I'll add them.</footer>
+
+  <script>
+    // Sample data (in real app, fetch from API)
+    const books = [
+      {id:1,title:'Atomic Habits',author:'James Clear',price:349,cat:'Self‑Help',cover:'AH'},
+      {id:2,title:'The Alchemist',author:'Paulo Coelho',price:199,cat:'Fiction',cover:'TA'},
+      {id:3,title:'Clean Code',author:'Robert C. Martin',price:799,cat:'Programming',cover:'CC'},
+      {id:4,title:'You Don\'t Know JS',author:'Kyle Simpson',price:649,cat:'Programming',cover:'YDK'},
+      {id:5,title:'Sapiens',author:'Yuval Noah Harari',price:499,cat:'History',cover:'SA'},
+      {id:6,title:'The Psychology of Money',author:'Morgan Housel',price:299,cat:'Finance',cover:'PM'},
+      {id:7,title:'The Midnight Library',author:'Matt Haig',price:249,cat:'Fiction',cover:'ML'},
+      {id:8,title:'Deep Work',author:'Cal Newport',price:399,cat:'Self‑Help',cover:'DW'},
+      {id:9,title:'Eloquent JavaScript',author:'Marijn Haverbeke',price:599,cat:'Programming',cover:'EJ'}
+    ];
+
+    let state = {query:'',category:null,maxPrice:2000,sort:'relevance',cart:{}};
+
+    function init(){
+      const cats = Array.from(new Set(books.map(b=>b.cat)));
+      const catList = document.getElementById('category-list');
+      cats.forEach(c=>{
+        const d = document.createElement('div'); d.className='category'; d.textContent=c;
+        d.onclick = ()=>{ state.category = state.category===c? null : c; onFilter(); highlightCats(); }
+        catList.appendChild(d);
+      });
+      document.getElementById('results-count').textContent = books.length;
+      renderBooks();
+      highlightCats();
+    }
+
+    function highlightCats(){
+      document.querySelectorAll('.category').forEach(el=>{
+        el.style.boxShadow = (el.textContent===state.category)? '0 6px 20px rgba(75,108,183,0.12)' : 'none';
+        el.style.borderColor = (el.textContent===state.category)? 'rgba(75,108,183,0.2)' : '#f1f5f9';
+      })
+    }
+
+    function onSearch(){ state.query = document.getElementById('q').value.toLowerCase(); renderBooks(); }
+    function onFilter(){ state.maxPrice = +document.getElementById('maxPrice').value; renderBooks(); }
+
+    function renderBooks(){
+      const grid = document.getElementById('grid'); grid.innerHTML='';
+      let res = books.filter(b=> b.price <= (state.maxPrice||2000) );
+      if(state.category) res = res.filter(b=> b.cat===state.category);
+      if(state.query) res = res.filter(b=> (b.title+b.author+b.cat).toLowerCase().includes(state.query));
+
+      if(state.sort==='price-asc') res.sort((a,b)=>a.price-b.price);
+      if(state.sort==='price-desc') res.sort((a,b)=>b.price-a.price);
+
+      document.getElementById('results-count').textContent = res.length;
+
+      res.forEach(b=>{
+        const card = document.createElement('div'); card.className='card';
+        card.innerHTML = `
+          <div class="thumb">${b.cover}</div>
+          <div class="meta">
+            <div class="title">${b.title}</div>
+            <div class="author">by ${b.author} • ${b.cat}</div>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+              <div class="price">₹${b.price}</div>
+              <div style="flex:1"></div>
+              <button class="small-btn" onclick='addToCart(${b.id})'>Add</button>
+            </div>
+          </div>`;
+        grid.appendChild(card);
+      });
+    }
+
+    function addToCart(id){
+      const book = books.find(b=>b.id===id);
+      if(!book) return;
+      state.cart[id] = (state.cart[id]||0) + 1;
+      updateCartUI();
+    }
+
+    function updateCartUI(){
+      const cartList = document.getElementById('cart-list'); cartList.innerHTML='';
+      const ids = Object.keys(state.cart);
+      if(ids.length===0){ cartList.innerHTML = '<div style="color:var(--muted)">Your cart is empty</div>'; }
+      let total=0; ids.forEach(k=>{
+        const qty = state.cart[k]; const book = books.find(b=>b.id==k); total += qty*book.price;
+        const el = document.createElement('div'); el.className='cart-item'; el.innerHTML = `
+          <div style="width:48px;height:56px;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">${book.cover}</div>
+          <div style="flex:1"><div style="font-weight:700">${book.title}</div><div style="font-size:13px;color:var(--muted)">by ${book.author}</div></div>
+          <div style="text-align:right"><div class="qty">${qty}×</div><div style="font-weight:700;margin-top:6px">₹${qty*book.price}</div></div>
+        `;
+        cartList.appendChild(el);
+      });
+      document.getElementById('cart-total').textContent = `₹${total}`;
+      document.getElementById('cart-count').textContent = ids.reduce((s,k)=>s+state.cart[k],0);
+    }
+
+    function openCart(){ document.querySelector('html').scrollTo({top:0,behavior:'smooth'}); }
+
+    function checkout(){
+      if(Object.keys(state.cart).length===0){ alert('Your cart is empty'); return; }
+      alert('Checkout demo — this is a static demo. In a real app you would connect a payments API.');
+      state.cart = {}; updateCartUI();
+    }
+
+    function toggleDark(){ document.body.classList.toggle('dark'); alert('Theme toggle demo — customize styles as needed.'); }
+
+    // initialize
+    init();
+    updateCartUI();
+  </script>
+</body>
+</html>
